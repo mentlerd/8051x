@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<language_definitions>
+  <language processor="8051x"
+            endian="big"
+            size="16"
+            variant="default"
+            version="0.1"
+            slafile="8051x.sla"
+            processorspec="8051x.pspec"
+            id="8051x:BE:16:default">
+    <description>8051 Microcontroller Family - Experimental</description>
+    <compiler name="default" spec="8051x.cspec" id="default"/>
+  </language>
+</language_definitions>
