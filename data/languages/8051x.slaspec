@@ -376,3 +376,21 @@ define token ccopy_data (48)
     dst = dst + 1;
     if (src != ccopy_end) goto <loop>;
 }
+
+define token code_param_t8  (8)  code_param8  = (0,1);
+define token code_param_t16 (16) code_param16 = (0,1);
+define token code_param_t24 (24) code_param24 = (0,1);
+define token code_param_t32 (32) code_param32 = (0,1);
+
+:__unkA Addr16 ??? is ophi=1 & oplo=2; addr16=0x0bfc & Addr16; code_param8 {
+    call Addr16;
+}
+:__unkB Addr16 ??? is ophi=1 & oplo=2; addr16=0x0c02 & Addr16; code_param8 {
+    call Addr16;
+}
+:__unkC Addr16 ??? is ophi=1 & oplo=2; addr16=0x0c06 & Addr16; code_param8 {
+    call Addr16;
+}
+:__unkD Addr16 ??? is ophi=1 & oplo=2; addr16=0x0d6c & Addr16; code_param32; code_param16 {
+
+}
