@@ -358,3 +358,21 @@ Rel8:   relAddr is rel8        [ relAddr=inst_next+rel8; ]      { export *:1 rel
 :XRL Areg,Data   is ophi=6 & oplo=4 & Areg; Data  { ACC = ACC ^ Data; }
 :XRL Direct,Areg is ophi=6 & oplo=2 & Areg; Direct  { Direct = Direct ^ ACC; }
 :XRL Direct,Data is ophi=6 & oplo=3; Direct; Data { Direct = Direct ^ Data; }
+
+
+define token ccopy_data (48)
+    ccopy_dst = (0,15)
+    ccopy_src = (16,31) 
+    ccopy_end = (32,47)
+;
+
+:__ccopy ccopy_src-len->ccopy_dst is ophi=1 & oplo=2; addr16=0x0e2c; ccopy_src & ccopy_end & ccopy_dst [ len = ccopy_end - ccopy_src; ] {
+    src:2 = ccopy_src;
+    dst:2 = ccopy_dst;
+
+    <loop>
+    *:1 dst = *:1 src;
+    src = src + 1;
+    dst = dst + 1;
+    if (src != ccopy_end) goto <loop>;
+}
