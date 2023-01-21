@@ -407,54 +407,6 @@ define token mb_5t (8) mb5_rn = (0,2) mb5_rnfill = (3,3) mb5_oplo = (0,3) mb5_op
 define token mb_6t (8) mb6_rn = (0,2) mb6_rnfill = (3,3) mb6_oplo = (0,3) mb6_ophi = (4,7);
 define token mb_7t (8) mb7_rn = (0,2) mb7_rnfill = (3,3) mb7_oplo = (0,3) mb7_ophi = (4,7);
 
-# === Pseudo instructions: Wide register indirect load ====================
-
-with : ctx_meta_op_mode = 0 {
-    :__load16_R0R1 is 
-        mb0_ophi=14 & mb0_oplo=0;              # MOVX A,@DPTR
-        mb1_ophi=15 & mb1_rnfill=1 & mb1_rn=0; # MOV  R0,A
-        mb2_ophi=10 & mb2_oplo=3;              # INC  DPTR
-        mb3_ophi=14 & mb3_oplo=0;              # MOVX A,@DPTR
-        mb4_ophi=15 & mb4_rnfill=1 & mb4_rn=1  # MOV  R1,A
-    {
-        R4R5 = *[EXTMEM]:2 DPTR;
-        DPTR = DPTR + 1;
-    }
-
-    :__load16_R2R3 is 
-        mb0_ophi=14 & mb0_oplo=0;
-        mb1_ophi=15 & mb1_rnfill=1 & mb1_rn=2;
-        mb2_ophi=10 & mb2_oplo=3;
-        mb3_ophi=14 & mb3_oplo=0;
-        mb4_ophi=15 & mb4_rnfill=1 & mb4_rn=3
-    {
-        R4R5 = *[EXTMEM]:2 DPTR;
-        DPTR = DPTR + 1;
-    }
-
-    :__load16_R4R5 is 
-        mb0_ophi=14 & mb0_oplo=0;
-        mb1_ophi=15 & mb1_rnfill=1 & mb1_rn=4;
-        mb2_ophi=10 & mb2_oplo=3;
-        mb3_ophi=14 & mb3_oplo=0;
-        mb4_ophi=15 & mb4_rnfill=1 & mb4_rn=5
-    {
-        R4R5 = *[EXTMEM]:2 DPTR;
-        DPTR = DPTR + 1;
-    }
-
-    :__load16_R6R7 is 
-        mb0_ophi=14 & mb0_oplo=0;
-        mb1_ophi=15 & mb1_rnfill=1 & mb1_rn=6;
-        mb2_ophi=10 & mb2_oplo=3;
-        mb3_ophi=14 & mb3_oplo=0;
-        mb4_ophi=15 & mb4_rnfill=1 & mb4_rn=7
-    {
-        R4R5 = *[EXTMEM]:2 DPTR;
-        DPTR = DPTR + 1;
-    }
-}
-
 # === Pseudo instructions: Wide register arithmetic ====================
 
 with : ctx_meta_op_mode = 0 {
@@ -502,7 +454,7 @@ with : ctx_meta_op_mode = 0 {
         dst:2 = ccopy_dst;
 
         <loop>
-        *:1 dst = *:1 src;
+        *[EXTMEM]:1 dst = *[CODE]:1 src;
         src = src + 1;
         dst = dst + 1;
         if (src != ccopy_end) goto <loop>;
