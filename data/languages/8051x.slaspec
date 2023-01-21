@@ -34,6 +34,35 @@ define register offset=0x48  size=1 [ PSW ];
 define pcodeop decimal_adjust;
 define pcodeop nop;
 
+# Context, meta instruction shenanigans
+#
+# While the processor itself has no context beside multi DPTR support (which is not modeled) some compilers
+#  implement language intrinsics in a way that an intrinsic implementation function consumes its constexpr
+#  parameters from the codespace by popping the return address, and reading data after it with `MOVC`
+#
+# This mixing of instructions and data in the same space confuses the disassembly engine, which expects
+#  normal fallthrough semantics from the `LCALL`s to these functions, and tries to interpret their parameters
+#  as instructions. Due to the almost complete utilization of the opbyte space, this usually does not trigger
+#  an error until the code flow is completely destroyed, and dozens of phantom functions are created.
+#
+# All of this crazyness is compensated for with "meta LCALL instructions" - when an LCALL to a specific
+#  address (which unfortunately varies by program to program) is encountered, we parse it as a meta instruction
+#  which spans across multiple instructions, and implement the schemantics of the intrinsic in pcode.
+#
+# To make things even worse, some intrinsics consume a non constant (but defined in codespace) amount of
+#  data after the LCALL to them. This case is compensated by changing the context into "meta instruction"
+#  mode, and tracking the number of extra constructs to consume after the initial instruction in a 
+#  context variable - essentially abusing the context register to implement a parsing state machine
+
+# TODO: Compiler complains when I don't have a varnode attached, why?
+define space CONTEXT type=ram_space size=1;
+define CONTEXT offset=0x0 size=4 [ contextreg ];
+
+define context contextreg
+    ctx_meta_op_mode = (0, 0) noflow
+    ctx_switch_arms_remain = (1,8) noflow
+;
+
 #TOKENS
 
 define token opbyte (8)
@@ -194,6 +223,10 @@ Addr11: relAddr is aopaddr & adata [ relAddr =(inst_next $and 0xf800)+(aopaddr*2
 Addr16: addr16 is addr16 { export *:1 addr16; }
 
 Rel8:   relAddr is rel8        [ relAddr=inst_next+rel8; ]      { export *:1 relAddr; }
+
+# Opcodes 
+
+with : ctx_meta_op_mode = 0 {
 
 :ACALL  Addr11 is  aaddrfill=1 & aoplo=1 & Addr11   { ret:2 = inst_next; push16(ret); call Addr11; }
 
@@ -359,7 +392,6 @@ Rel8:   relAddr is rel8        [ relAddr=inst_next+rel8; ]      { export *:1 rel
 :XRL Direct,Areg is ophi=6 & oplo=2 & Areg; Direct  { Direct = Direct ^ ACC; }
 :XRL Direct,Data is ophi=6 & oplo=3; Direct; Data { Direct = Direct ^ Data; }
 
-
 define token ccopy_data (48)
     ccopy_dst = (0,15)
     ccopy_src = (16,31) 
@@ -391,6 +423,38 @@ define token code_param_t32 (32) code_param32 = (0,1);
 :__unkC Addr16 ??? is ophi=1 & oplo=2; addr16=0x0c06 & Addr16; code_param8 {
     call Addr16;
 }
-:__unkD Addr16 ??? is ophi=1 & oplo=2; addr16=0x0d6c & Addr16; code_param32; code_param16 {
+
+define token sw_unkA_t (8) sw_unkA = (0,0);
+define token sw_count_t (8) sw_count = (0,7);
+
+:__switch Addr16 ??? is ophi=1 & oplo=2; addr16=0x0d6c & Addr16; sw_unkA; sw_count 
+[
+    # Enter meta parsing mode
+    ctx_meta_op_mode = 1;
+    globalset(inst_next, ctx_meta_op_mode);
+
+    # Expect sw_count __switch_case instructions to follow
+    ctx_switch_arms_remain = sw_count * 2;
+    globalset(inst_next, ctx_switch_arms_remain);
+]
+{}
+
+}
+
+with : ctx_meta_op_mode = 1 {
+
+:__switch_case addr16 is ctx_switch_arms_remain != 1 & addr16
+[
+    # Retain meta parsing mode
+    globalset(inst_next, ctx_meta_op_mode);
+
+    # Expect more switch labels
+    ctx_switch_arms_remain = ctx_switch_arms_remain - 1;
+    globalset(inst_next, ctx_switch_arms_remain);
+]
+{}
+
+:__switch_case addr16 is ctx_switch_arms_remain = 1 & addr16 
+{}
 
 }
