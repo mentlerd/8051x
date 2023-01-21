@@ -410,7 +410,9 @@ define token mb_7t (8) mb7_rn = (0,2) mb7_rnfill = (3,3) mb7_oplo = (0,3) mb7_op
 # === Pseudo instructions: Wide register arithmetic ====================
 
 with : ctx_meta_op_mode = 0 {
-    :__add16_R2R3_R4R5 is
+    # TODO: CPU flags not modeled
+
+    :__add16 is
         mb0_ophi=14 & mb0_rnfill=1 & mb0_rn=3; # MOV  A,R3
         mb1_ophi=2  & mb1_rnfill=1 & mb1_rn=5; # ADD  A,R5
         mb2_ophi=15 & mb2_rnfill=1 & mb2_rn=3; # MOV  R3,A
@@ -418,13 +420,13 @@ with : ctx_meta_op_mode = 0 {
         mb4_ophi=3  & mb4_rnfill=1 & mb4_rn=4; # ADDC A,R4
         mb5_ophi=15 & mb5_rnfill=1 & mb5_rn=2  # MOV  R2,A
     {
-        R2R3 = R2R3 + R4R5;
+        local c:1 = carry(R3, R5);
 
-        addflags(R2, R4);
-        resultflags(R2);
+        R3 = R3 + R5;
+        R2 = R2 + R4 + c;
     }
 
-    :__sub16_R2R3_R4R5 is
+    :__sub16 is
         mb0_ophi=14 & mb0_rnfill=1 & mb0_rn=5; # MOV  A,R5
         mb1_ophi=12 & mb1_oplo=3;              # CLR  CY
         mb2_ophi=9  & mb2_rnfill=1 & mb2_rn=3; # SUBB A,R3
@@ -432,11 +434,32 @@ with : ctx_meta_op_mode = 0 {
         mb4_ophi=14 & mb4_rnfill=1 & mb4_rn=4; # MOV  A,R4
         mb5_ophi=9  & mb5_rnfill=1 & mb5_rn=2; # SUBB A,R2
         mb6_ophi=15 & mb6_rnfill=1 & mb6_rn=2; # MOV  R2,A
-        mb7_ophi=4  & mb7_rnfill=1 & mb7_rn=3  # ORL  A,R3
-    {
-        R2R3 = R2R3 - R4R5;
 
-        # TODO: Model flags
+        # mb7_ophi=4  & mb7_rnfill=1 & mb7_rn=3  # ORL  A,R3
+        epsilon
+    {
+        local b:1 = sborrow(R5, R3);
+
+        R3 = R5 - R3;
+        R2 = R4 - R2 - b;
+    }
+
+    :__sub16 is
+        mb0_ophi=12 & mb0_oplo=3;              # CLR  CY
+        mb1_ophi=14 & mb1_rnfill=1 & mb1_rn=5; # MOV  A,R5
+        mb2_ophi=9  & mb2_rnfill=1 & mb2_rn=3; # SUBB A,R3
+        mb3_ophi=15 & mb3_rnfill=1 & mb3_rn=3; # MOV  R3,A
+        mb4_ophi=14 & mb4_rnfill=1 & mb4_rn=4; # MOV  A,R4
+        mb5_ophi=9  & mb5_rnfill=1 & mb5_rn=2; # SUBB A,R2
+        mb6_ophi=15 & mb6_rnfill=1 & mb6_rn=2; # MOV  R2,A
+        
+        # mb7_ophi=4  & mb7_rnfill=1 & mb7_rn=3  # ORL  A,R3
+        epsilon
+    {
+        local b:1 = sborrow(R5, R3);
+
+        R3 = R5 - R3;
+        R2 = R4 - R2 - b;
     }
 }
 
