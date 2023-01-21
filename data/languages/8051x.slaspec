@@ -397,6 +397,46 @@ with : ctx_meta_op_mode = 0 {
 
 }
 
+# === Pseudo instructions: Multibyte OPs ====================
+
+define token mb_arith_0t (8) mb0_rn = (0,2) mb0_rnfill = (3,3) mb0_oplo = (0,3) mb0_ophi = (4,7);
+define token mb_arith_1t (8) mb1_rn = (0,2) mb1_rnfill = (3,3) mb1_oplo = (0,3) mb1_ophi = (4,7);
+define token mb_arith_2t (8) mb2_rn = (0,2) mb2_rnfill = (3,3) mb2_oplo = (0,3) mb2_ophi = (4,7);
+define token mb_arith_3t (8) mb3_rn = (0,2) mb3_rnfill = (3,3) mb3_oplo = (0,3) mb3_ophi = (4,7);
+define token mb_arith_4t (8) mb4_rn = (0,2) mb4_rnfill = (3,3) mb4_oplo = (0,3) mb4_ophi = (4,7);
+define token mb_arith_5t (8) mb5_rn = (0,2) mb5_rnfill = (3,3) mb5_oplo = (0,3) mb5_ophi = (4,7);
+
+with : ctx_meta_op_mode = 0 {
+
+    :__add16 is
+        mb0_ophi=14 & mb0_rnfill=1 & mb0_rn = 3; # MOV  A,R3
+        mb1_ophi=2  & mb1_rnfill=1 & mb1_rn = 5; # ADD  A,R5
+        mb2_ophi=15 & mb2_rnfill=1 & mb2_rn = 3; # MOV  R3,A
+        mb3_ophi=14 & mb3_rnfill=1 & mb3_rn = 2; # MOV  A,R2
+        mb4_ophi=3  & mb4_rnfill=1 & mb4_rn = 4; # ADDC A,R4
+        mb5_ophi=15 & mb5_rnfill=1 & mb5_rn = 2  # MOV  R2,A
+    {
+        R2R3 = R2R3 + R4R5;
+
+        addflags(R2, R4);
+        resultflags(R2);
+    }
+
+    :__load16 is 
+        mb0_ophi=14 & mb0_oplo=0;              # MOVX A,@DPTR
+        mb1_ophi=15 & mb1_rnfill=1 & mb1_rn=4; # MOV  R4,A
+        mb2_ophi=10 & mb2_oplo=3;              # INC  DPTR
+        mb3_ophi=14 & mb3_oplo=0;              # MOVX A,@DPTR
+        mb4_ophi=15 & mb4_rnfill=1 & mb4_rn=5  # MOV  R5,A
+    {
+        R4R5 = *[EXTMEM]:2 DPTR;
+        DPTR = DPTR + 1;
+    }
+
+    # :MOVX  Areg,ATDPTR  is ophi=14 & oplo=0 & Areg & ATDPTR { ACC = ATDPTR; }
+    # :INC DPTRreg is ophi=10 & oplo=3 & DPTRreg  { DPTR = DPTR + 1; }
+}
+
 # ==== Pseudo instructions: __ccopy ====================
 
 define token ccopy_data (48)
@@ -544,5 +584,5 @@ with : ctx_meta_op_mode = 0 {
 
         goto [target];
     }
-    
+
 }
