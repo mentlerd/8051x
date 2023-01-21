@@ -56,11 +56,13 @@ define pcodeop nop;
 
 # TODO: Compiler complains when I don't have a varnode attached, why?
 define space CONTEXT type=ram_space size=1;
-define CONTEXT offset=0x0 size=4 [ contextreg ];
+define CONTEXT offset=0x0 size=8 [ contextreg ];
 
 define context contextreg
-    ctx_meta_op_mode = (0, 0) noflow
-    ctx_switch_arms_remain = (1,8) noflow
+    ctx_meta_op_mode       = (0, 0) noflow
+
+    ctx_switch_arms_remain = (8,15) noflow
+    ctx_switch_arms_max    = (16,31) noflow
 ;
 
 #TOKENS
@@ -424,37 +426,58 @@ define token code_param_t32 (32) code_param32 = (0,1);
     call Addr16;
 }
 
-define token sw_unkA_t (8) sw_unkA = (0,0);
-define token sw_count_t (8) sw_count = (0,7);
+define token sw_min_t (16) sw_min = (0,15);
+define token sw_max_t (16) sw_max = (0,15);
+define token sw_default_t (16) sw_default = (0,15);
 
-:__switch Addr16 ??? is ophi=1 & oplo=2; addr16=0x0d6c & Addr16; sw_unkA; sw_count 
+:__switch sw_min,sw_max is ophi=1 & oplo=2; addr16=0x0d6c & Addr16; sw_min; sw_max; sw_default
 [
     # Enter meta parsing mode
     ctx_meta_op_mode = 1;
     globalset(inst_next, ctx_meta_op_mode);
 
-    # Expect sw_count __switch_case instructions to follow
-    ctx_switch_arms_remain = sw_count * 2;
+    # Propagate active switch info
+    ctx_switch_arms_max = sw_max;
+    globalset(inst_next, ctx_switch_arms_max);
+
+    # Expect some switch arms to follow
+    ctx_switch_arms_remain = sw_max - sw_min + 1;
     globalset(inst_next, ctx_switch_arms_remain);
 ]
-{}
+{
+    call Addr16;
+}
 
 }
 
 with : ctx_meta_op_mode = 1 {
 
-:__switch_case addr16 is ctx_switch_arms_remain != 1 & addr16
+:__switch_case sw_case Addr16 is ctx_switch_arms_remain != 1 & Addr16
 [
-    # Retain meta parsing mode
-    globalset(inst_next, ctx_meta_op_mode);
+    sw_case = ctx_switch_arms_max - ctx_switch_arms_remain - 1;
 
-    # Expect more switch labels
+    # Propagate context
+    globalset(inst_next, ctx_meta_op_mode);
+    globalset(inst_next, ctx_switch_arms_max);
+
+    # Expect more switch arms
     ctx_switch_arms_remain = ctx_switch_arms_remain - 1;
     globalset(inst_next, ctx_switch_arms_remain);
 ]
-{}
+{
+    call Addr16;
+}
 
-:__switch_case addr16 is ctx_switch_arms_remain = 1 & addr16 
-{}
+:__switch_case sw_case Addr16 is ctx_switch_arms_remain = 1 & Addr16 
+[
+    sw_case = ctx_switch_arms_max;
+
+    # Exit meta parsing mode
+    ctx_meta_op_mode = 0;
+    globalset(inst_next, ctx_meta_op_mode);
+]
+{
+    goto Addr16;
+}
 
 }
