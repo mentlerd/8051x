@@ -427,17 +427,44 @@ with : ctx_meta_op_mode = 0 {
         if (src != ccopy_end) goto <loop>;
     }
 
-    :__unkA Addr16 ??? is ophi=1 & oplo=2; addr16=0x0bfc & Addr16; code_param8 {
-        call Addr16;
-    }
-    :__unkB Addr16 ??? is ophi=1 & oplo=2; addr16=0x0c02 & Addr16; code_param8 {
-        call Addr16;
-    }
-    :__unkC Addr16 ??? is ophi=1 & oplo=2; addr16=0x0c06 & Addr16; code_param8 {
-        call Addr16;
+    # Post-increment operators implemented as subroutines - width follows in codespace
+    :__operator++ is ophi=1 & oplo=2; addr16=0x0bfc; code_param8 unimpl
+    :__operator-- is ophi=1 & oplo=2; addr16=0x0c02; code_param8 unimpl
+    :__operator+= is ophi=1 & oplo=2; addr16=0x0c06; code_param8 unimpl
+
+    :__operator++ is ophi=1 & oplo=2; addr16=0x0bfc; code_param8=1 {
+        local addr:2 = R2R3;
+
+        R3 = (*[EXTMEM]:1 addr) + 1;
+        *[EXTMEM]:1 addr = R3;
+        R3 = R3 - 1;
     }
 
-    :__switch sw_min,sw_max is ophi=1 & oplo=2; addr16=0x0d6c & Addr16; sw_min; sw_max; SwDefault
+    :__operator++ is ophi=1 & oplo=2; addr16=0x0bfc; code_param8=2 {
+        local addr:2 = R2R3;
+
+        R2R3 = (*[EXTMEM]:2 addr) + 1;
+        *[EXTMEM]:2 addr = R2R3;
+        R2R3 = R2R3 - 1;
+    }
+
+    :__operator-- is ophi=1 & oplo=2; addr16=0x0c02; code_param8=1 {
+        local addr:2 = R2R3;
+
+        R3 = (*[EXTMEM]:1 addr) - 1;
+        *[EXTMEM]:1 addr = R3;
+        R3 = R3 + 1;
+    }
+
+    :__operator-- is ophi=1 & oplo=2; addr16=0x0c02; code_param8=2 {
+        local addr:2 = R2R3;
+
+        R2R3 = (*[EXTMEM]:2 addr) - 1;
+        *[EXTMEM]:1 addr = R2R3;
+        R2R3 = R2R3 + 1;
+    }
+
+    :__switch sw_min,sw_max is ophi=1 & oplo=2; addr16=0x0d6c; sw_min; sw_max; SwDefault
     [
         # Enter meta parsing mode
         ctx_meta_op_mode = 1;
@@ -452,8 +479,6 @@ with : ctx_meta_op_mode = 0 {
         globalset(inst_next, ctx_switch_arms_remain);
     ]
     {
-        call Addr16;
-
         if (R2R3 < sw_min) goto SwDefault;
         if (R2R3 > sw_max) goto SwDefault;
 
@@ -462,6 +487,18 @@ with : ctx_meta_op_mode = 0 {
         goto [target];
     }
 
+    # LJMP specialization
+
+    :__unkD Addr16 ??? is ophi=0 & oplo=2; addr16=0x0ea0 & Addr16 {
+        call Addr16;
+
+        local base:2 = R6R7;
+
+        local target:2 = *[EXTMEM]:2 base;
+        R6R7 = *[EXTMEM]:2 (base + 2);
+
+        goto [target];
+    }
 }
 
 with : ctx_meta_op_mode = 1 {
