@@ -5,8 +5,8 @@
     <range space="CODE"/>
     <range space="INTMEM"/>
     <range space="SFR"/>
+    <range space="PSW_BITS"/>
     <range space="EXTMEM"/>
-    <range space="BITS"/>
   </global>
   <stackpointer register="SP" space="INTMEM" growth="positive"/>
   <default_proto>
@@ -58,24 +58,5 @@
         <range space="stack" first="0x0" last="0xf"/>
       </localrange>
     </prototype>
-  </default_proto>
-  
-  <callfixup name="switch_override_ACC">
-    <pcode>
-      <body><![CDATA[
-			PC = inst_next + zext(ACC) * 3;
-            goto [PC];
-      ]]></body>
-    </pcode>
-  </callfixup>
-
-  <callfixup name="LCALL_grab1">
-    <pcode>
-      <body><![CDATA[
-      PC = inst_next + 4;
-      goto [PC];
-      ]]></body>
-  </pcode>
-</callfixup>
-  
+  </default_proto>  
 </compiler_spec>
