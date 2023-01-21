@@ -11,6 +11,7 @@ define space register type=register_space size=1;
 
 # Register File
 define register offset=0x00  size=1 [ R0 R1 R2 R3 R4 R5 R6 R7 ];
+define register offset=0x00  size=2 [ R0R1  R2R3  R4R5  R6R7 ];
 
 define register offset=0x0A  size=1 [ B ACC ];  # relocated to facilitate AB 16-bit access
 define register offset=0x0A  size=2 [ AB ];
@@ -394,90 +395,99 @@ with : ctx_meta_op_mode = 0 {
 :XRL Direct,Areg is ophi=6 & oplo=2 & Areg; Direct  { Direct = Direct ^ ACC; }
 :XRL Direct,Data is ophi=6 & oplo=3; Direct; Data { Direct = Direct ^ Data; }
 
+}
+
 define token ccopy_data (48)
     ccopy_dst = (0,15)
     ccopy_src = (16,31) 
     ccopy_end = (32,47)
 ;
 
-:__ccopy ccopy_src-len->ccopy_dst is ophi=1 & oplo=2; addr16=0x0e2c; ccopy_src & ccopy_end & ccopy_dst [ len = ccopy_end - ccopy_src; ] {
-    src:2 = ccopy_src;
-    dst:2 = ccopy_dst;
-
-    <loop>
-    *:1 dst = *:1 src;
-    src = src + 1;
-    dst = dst + 1;
-    if (src != ccopy_end) goto <loop>;
-}
-
 define token code_param_t8  (8)  code_param8  = (0,1);
 define token code_param_t16 (16) code_param16 = (0,1);
 define token code_param_t24 (24) code_param24 = (0,1);
 define token code_param_t32 (32) code_param32 = (0,1);
 
-:__unkA Addr16 ??? is ophi=1 & oplo=2; addr16=0x0bfc & Addr16; code_param8 {
-    call Addr16;
-}
-:__unkB Addr16 ??? is ophi=1 & oplo=2; addr16=0x0c02 & Addr16; code_param8 {
-    call Addr16;
-}
-:__unkC Addr16 ??? is ophi=1 & oplo=2; addr16=0x0c06 & Addr16; code_param8 {
-    call Addr16;
-}
-
 define token sw_min_t (16) sw_min = (0,15);
 define token sw_max_t (16) sw_max = (0,15);
 define token sw_default_t (16) sw_default = (0,15);
 
-:__switch sw_min,sw_max is ophi=1 & oplo=2; addr16=0x0d6c & Addr16; sw_min; sw_max; sw_default
-[
-    # Enter meta parsing mode
-    ctx_meta_op_mode = 1;
-    globalset(inst_next, ctx_meta_op_mode);
+SwDefault: is sw_default { export *:1 sw_default; }
 
-    # Propagate active switch info
-    ctx_switch_arms_max = sw_max;
-    globalset(inst_next, ctx_switch_arms_max);
+with : ctx_meta_op_mode = 0 {
 
-    # Expect some switch arms to follow
-    ctx_switch_arms_remain = sw_max - sw_min + 1;
-    globalset(inst_next, ctx_switch_arms_remain);
-]
-{
-    call Addr16;
-}
+    :__ccopy ccopy_src-len->ccopy_dst is ophi=1 & oplo=2; addr16=0x0e2c; ccopy_src & ccopy_end & ccopy_dst [ len = ccopy_end - ccopy_src; ] {
+        src:2 = ccopy_src;
+        dst:2 = ccopy_dst;
+
+        <loop>
+        *:1 dst = *:1 src;
+        src = src + 1;
+        dst = dst + 1;
+        if (src != ccopy_end) goto <loop>;
+    }
+
+    :__unkA Addr16 ??? is ophi=1 & oplo=2; addr16=0x0bfc & Addr16; code_param8 {
+        call Addr16;
+    }
+    :__unkB Addr16 ??? is ophi=1 & oplo=2; addr16=0x0c02 & Addr16; code_param8 {
+        call Addr16;
+    }
+    :__unkC Addr16 ??? is ophi=1 & oplo=2; addr16=0x0c06 & Addr16; code_param8 {
+        call Addr16;
+    }
+
+    :__switch sw_min,sw_max is ophi=1 & oplo=2; addr16=0x0d6c & Addr16; sw_min; sw_max; SwDefault
+    [
+        # Enter meta parsing mode
+        ctx_meta_op_mode = 1;
+        globalset(inst_next, ctx_meta_op_mode);
+
+        # Propagate active switch info
+        ctx_switch_arms_max = sw_max;
+        globalset(inst_next, ctx_switch_arms_max);
+
+        # Expect some switch arms to follow
+        ctx_switch_arms_remain = sw_max - sw_min + 1;
+        globalset(inst_next, ctx_switch_arms_remain);
+    ]
+    {
+        call Addr16;
+
+        if (R2R3 < sw_min) goto SwDefault;
+        if (R2R3 > sw_max) goto SwDefault;
+
+        local case:2 = inst_next + (R2R3 - sw_min) * 2;
+        local target:2 = *[CODE]:2 case;
+        goto [target];
+    }
 
 }
 
 with : ctx_meta_op_mode = 1 {
 
-:__switch_case sw_case Addr16 is ctx_switch_arms_remain != 1 & Addr16
-[
-    sw_case = ctx_switch_arms_max - ctx_switch_arms_remain - 1;
+    :__switch_case sw_case Addr16 is ctx_switch_arms_remain != 1 & Addr16
+    [
+        sw_case = ctx_switch_arms_max - ctx_switch_arms_remain;
 
-    # Propagate context
-    globalset(inst_next, ctx_meta_op_mode);
-    globalset(inst_next, ctx_switch_arms_max);
+        # Propagate context
+        globalset(inst_next, ctx_meta_op_mode);
+        globalset(inst_next, ctx_switch_arms_max);
 
-    # Expect more switch arms
-    ctx_switch_arms_remain = ctx_switch_arms_remain - 1;
-    globalset(inst_next, ctx_switch_arms_remain);
-]
-{
-    call Addr16;
-}
+        # Expect more switch arms
+        ctx_switch_arms_remain = ctx_switch_arms_remain - 1;
+        globalset(inst_next, ctx_switch_arms_remain);
+    ]
+    {}
 
-:__switch_case sw_case Addr16 is ctx_switch_arms_remain = 1 & Addr16 
-[
-    sw_case = ctx_switch_arms_max;
+    :__switch_case sw_case Addr16 is ctx_switch_arms_remain = 1 & Addr16
+    [
+        sw_case = ctx_switch_arms_max;
 
-    # Exit meta parsing mode
-    ctx_meta_op_mode = 0;
-    globalset(inst_next, ctx_meta_op_mode);
-]
-{
-    goto Addr16;
-}
+        # Exit meta parsing mode
+        ctx_meta_op_mode = 0;
+        globalset(inst_next, ctx_meta_op_mode);
+    ]
+    {}
 
 }
