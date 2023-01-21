@@ -397,25 +397,15 @@ with : ctx_meta_op_mode = 0 {
 
 }
 
+# ==== Pseudo instructions: __ccopy ====================
+
 define token ccopy_data (48)
     ccopy_dst = (0,15)
     ccopy_src = (16,31) 
     ccopy_end = (32,47)
 ;
 
-define token code_param_t8  (8)  code_param8  = (0,1);
-define token code_param_t16 (16) code_param16 = (0,1);
-define token code_param_t24 (24) code_param24 = (0,1);
-define token code_param_t32 (32) code_param32 = (0,1);
-
-define token sw_min_t (16) sw_min = (0,15);
-define token sw_max_t (16) sw_max = (0,15);
-define token sw_default_t (16) sw_default = (0,15);
-
-SwDefault: is sw_default { export *:1 sw_default; }
-
 with : ctx_meta_op_mode = 0 {
-
     :__ccopy ccopy_src-len->ccopy_dst is ophi=1 & oplo=2; addr16=0x0e2c; ccopy_src & ccopy_end & ccopy_dst [ len = ccopy_end - ccopy_src; ] {
         src:2 = ccopy_src;
         dst:2 = ccopy_dst;
@@ -426,29 +416,29 @@ with : ctx_meta_op_mode = 0 {
         dst = dst + 1;
         if (src != ccopy_end) goto <loop>;
     }
+}
 
-    # Post-increment operators implemented as subroutines - width follows in codespace
-    :__operator++ is ophi=1 & oplo=2; addr16=0x0bfc; code_param8 unimpl
-    :__operator-- is ophi=1 & oplo=2; addr16=0x0c02; code_param8 unimpl
-    :__operator+= is ophi=1 & oplo=2; addr16=0x0c06; code_param8 unimpl
+# ==== Pseudo instructions: __operator++/-- ====================
 
-    :__operator++ is ophi=1 & oplo=2; addr16=0x0bfc; code_param8=1 {
+define token inc_width_t (8) inc_width = (0,7); 
+
+with : ctx_meta_op_mode = 0 {
+    # Main operator - not actually directly used, thus not lifted
+    :__operator+= is ophi=1 & oplo=2; addr16=0x0c06; inc_width unimpl
+
+    # Default cases for non-implemented widths
+    :__operator++ is ophi=1 & oplo=2; addr16=0x0bfc; inc_width unimpl
+    :__operator-- is ophi=1 & oplo=2; addr16=0x0c02; inc_width unimpl
+
+    # Implementations
+    :__operator++ is ophi=1 & oplo=2; addr16=0x0bfc; inc_width=1 {
         local addr:2 = R2R3;
 
         R3 = (*[EXTMEM]:1 addr) + 1;
         *[EXTMEM]:1 addr = R3;
         R3 = R3 - 1;
     }
-
-    :__operator++ is ophi=1 & oplo=2; addr16=0x0bfc; code_param8=2 {
-        local addr:2 = R2R3;
-
-        R2R3 = (*[EXTMEM]:2 addr) + 1;
-        *[EXTMEM]:2 addr = R2R3;
-        R2R3 = R2R3 - 1;
-    }
-
-    :__operator-- is ophi=1 & oplo=2; addr16=0x0c02; code_param8=1 {
+    :__operator-- is ophi=1 & oplo=2; addr16=0x0c02; inc_width=1 {
         local addr:2 = R2R3;
 
         R3 = (*[EXTMEM]:1 addr) - 1;
@@ -456,14 +446,31 @@ with : ctx_meta_op_mode = 0 {
         R3 = R3 + 1;
     }
 
-    :__operator-- is ophi=1 & oplo=2; addr16=0x0c02; code_param8=2 {
+    :__operator++ is ophi=1 & oplo=2; addr16=0x0bfc; inc_width=2 {
+        local addr:2 = R2R3;
+
+        R2R3 = (*[EXTMEM]:2 addr) + 1;
+        *[EXTMEM]:2 addr = R2R3;
+        R2R3 = R2R3 - 1;
+    }
+    :__operator-- is ophi=1 & oplo=2; addr16=0x0c02; inc_width=2 {
         local addr:2 = R2R3;
 
         R2R3 = (*[EXTMEM]:2 addr) - 1;
         *[EXTMEM]:1 addr = R2R3;
         R2R3 = R2R3 + 1;
     }
+}
 
+# ==== Pseudo instructions: switch range =====================
+
+define token sw_min_t (16) sw_min = (0,15);
+define token sw_max_t (16) sw_max = (0,15);
+define token sw_default_t (16) sw_default = (0,15);
+
+SwDefault: is sw_default { export *:1 sw_default; }
+
+with : ctx_meta_op_mode = 0 {
     :__switch sw_min,sw_max is ophi=1 & oplo=2; addr16=0x0d6c; sw_min; sw_max; SwDefault
     [
         # Enter meta parsing mode
@@ -486,22 +493,11 @@ with : ctx_meta_op_mode = 0 {
         local target:2 = *[CODE]:2 case;
         goto [target];
     }
-
-    # LJMP specialization
-
-    :__unkD Addr16 ??? is ophi=0 & oplo=2; addr16=0x0ea0 & Addr16 {
-        call Addr16;
-
-        local base:2 = R6R7;
-
-        local target:2 = *[EXTMEM]:2 base;
-        R6R7 = *[EXTMEM]:2 (base + 2);
-
-        goto [target];
-    }
 }
 
 with : ctx_meta_op_mode = 1 {
+    # Below constructors are intended to automatically consume jumptable
+    #  following a __switch
 
     :__switch_case sw_case Addr16 is ctx_switch_arms_remain != 1 & Addr16
     [
@@ -526,5 +522,27 @@ with : ctx_meta_op_mode = 1 {
         globalset(inst_next, ctx_meta_op_mode);
     ]
     {}
+}
 
+# ==== Pseudo instructions: unknown =====================
+
+define token code_param_t8  (8)  code_param8  = (0,1);
+define token code_param_t16 (16) code_param16 = (0,1);
+define token code_param_t24 (24) code_param24 = (0,1);
+define token code_param_t32 (32) code_param32 = (0,1);
+
+with : ctx_meta_op_mode = 0 {
+
+    # Weird LJMP specialization - function pointer support?
+    :__unkD Addr16 ??? is ophi=0 & oplo=2; addr16=0x0ea0 & Addr16 {
+        call Addr16;
+
+        local base:2 = R6R7;
+
+        local target:2 = *[EXTMEM]:2 base;
+        R6R7 = *[EXTMEM]:2 (base + 2);
+
+        goto [target];
+    }
+    
 }
