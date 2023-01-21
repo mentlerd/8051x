@@ -397,24 +397,74 @@ with : ctx_meta_op_mode = 0 {
 
 }
 
-# === Pseudo instructions: Multibyte OPs ====================
 
-define token mb_arith_0t (8) mb0_rn = (0,2) mb0_rnfill = (3,3) mb0_oplo = (0,3) mb0_ophi = (4,7);
-define token mb_arith_1t (8) mb1_rn = (0,2) mb1_rnfill = (3,3) mb1_oplo = (0,3) mb1_ophi = (4,7);
-define token mb_arith_2t (8) mb2_rn = (0,2) mb2_rnfill = (3,3) mb2_oplo = (0,3) mb2_ophi = (4,7);
-define token mb_arith_3t (8) mb3_rn = (0,2) mb3_rnfill = (3,3) mb3_oplo = (0,3) mb3_ophi = (4,7);
-define token mb_arith_4t (8) mb4_rn = (0,2) mb4_rnfill = (3,3) mb4_oplo = (0,3) mb4_ophi = (4,7);
-define token mb_arith_5t (8) mb5_rn = (0,2) mb5_rnfill = (3,3) mb5_oplo = (0,3) mb5_ophi = (4,7);
+define token mb_0t (8) mb0_rn = (0,2) mb0_rnfill = (3,3) mb0_oplo = (0,3) mb0_ophi = (4,7);
+define token mb_1t (8) mb1_rn = (0,2) mb1_rnfill = (3,3) mb1_oplo = (0,3) mb1_ophi = (4,7);
+define token mb_2t (8) mb2_rn = (0,2) mb2_rnfill = (3,3) mb2_oplo = (0,3) mb2_ophi = (4,7);
+define token mb_3t (8) mb3_rn = (0,2) mb3_rnfill = (3,3) mb3_oplo = (0,3) mb3_ophi = (4,7);
+define token mb_4t (8) mb4_rn = (0,2) mb4_rnfill = (3,3) mb4_oplo = (0,3) mb4_ophi = (4,7);
+define token mb_5t (8) mb5_rn = (0,2) mb5_rnfill = (3,3) mb5_oplo = (0,3) mb5_ophi = (4,7);
+define token mb_6t (8) mb6_rn = (0,2) mb6_rnfill = (3,3) mb6_oplo = (0,3) mb6_ophi = (4,7);
+define token mb_7t (8) mb7_rn = (0,2) mb7_rnfill = (3,3) mb7_oplo = (0,3) mb7_ophi = (4,7);
+
+# === Pseudo instructions: Wide register indirect load ====================
 
 with : ctx_meta_op_mode = 0 {
+    :__load16_R0R1 is 
+        mb0_ophi=14 & mb0_oplo=0;              # MOVX A,@DPTR
+        mb1_ophi=15 & mb1_rnfill=1 & mb1_rn=0; # MOV  R0,A
+        mb2_ophi=10 & mb2_oplo=3;              # INC  DPTR
+        mb3_ophi=14 & mb3_oplo=0;              # MOVX A,@DPTR
+        mb4_ophi=15 & mb4_rnfill=1 & mb4_rn=1  # MOV  R1,A
+    {
+        R4R5 = *[EXTMEM]:2 DPTR;
+        DPTR = DPTR + 1;
+    }
 
-    :__add16 is
-        mb0_ophi=14 & mb0_rnfill=1 & mb0_rn = 3; # MOV  A,R3
-        mb1_ophi=2  & mb1_rnfill=1 & mb1_rn = 5; # ADD  A,R5
-        mb2_ophi=15 & mb2_rnfill=1 & mb2_rn = 3; # MOV  R3,A
-        mb3_ophi=14 & mb3_rnfill=1 & mb3_rn = 2; # MOV  A,R2
-        mb4_ophi=3  & mb4_rnfill=1 & mb4_rn = 4; # ADDC A,R4
-        mb5_ophi=15 & mb5_rnfill=1 & mb5_rn = 2  # MOV  R2,A
+    :__load16_R2R3 is 
+        mb0_ophi=14 & mb0_oplo=0;
+        mb1_ophi=15 & mb1_rnfill=1 & mb1_rn=2;
+        mb2_ophi=10 & mb2_oplo=3;
+        mb3_ophi=14 & mb3_oplo=0;
+        mb4_ophi=15 & mb4_rnfill=1 & mb4_rn=3
+    {
+        R4R5 = *[EXTMEM]:2 DPTR;
+        DPTR = DPTR + 1;
+    }
+
+    :__load16_R4R5 is 
+        mb0_ophi=14 & mb0_oplo=0;
+        mb1_ophi=15 & mb1_rnfill=1 & mb1_rn=4;
+        mb2_ophi=10 & mb2_oplo=3;
+        mb3_ophi=14 & mb3_oplo=0;
+        mb4_ophi=15 & mb4_rnfill=1 & mb4_rn=5
+    {
+        R4R5 = *[EXTMEM]:2 DPTR;
+        DPTR = DPTR + 1;
+    }
+
+    :__load16_R6R7 is 
+        mb0_ophi=14 & mb0_oplo=0;
+        mb1_ophi=15 & mb1_rnfill=1 & mb1_rn=6;
+        mb2_ophi=10 & mb2_oplo=3;
+        mb3_ophi=14 & mb3_oplo=0;
+        mb4_ophi=15 & mb4_rnfill=1 & mb4_rn=7
+    {
+        R4R5 = *[EXTMEM]:2 DPTR;
+        DPTR = DPTR + 1;
+    }
+}
+
+# === Pseudo instructions: Wide register arithmetic ====================
+
+with : ctx_meta_op_mode = 0 {
+    :__add16_R2R3_R4R5 is
+        mb0_ophi=14 & mb0_rnfill=1 & mb0_rn=3; # MOV  A,R3
+        mb1_ophi=2  & mb1_rnfill=1 & mb1_rn=5; # ADD  A,R5
+        mb2_ophi=15 & mb2_rnfill=1 & mb2_rn=3; # MOV  R3,A
+        mb3_ophi=14 & mb3_rnfill=1 & mb3_rn=2; # MOV  A,R2
+        mb4_ophi=3  & mb4_rnfill=1 & mb4_rn=4; # ADDC A,R4
+        mb5_ophi=15 & mb5_rnfill=1 & mb5_rn=2  # MOV  R2,A
     {
         R2R3 = R2R3 + R4R5;
 
@@ -422,19 +472,20 @@ with : ctx_meta_op_mode = 0 {
         resultflags(R2);
     }
 
-    :__load16 is 
-        mb0_ophi=14 & mb0_oplo=0;              # MOVX A,@DPTR
-        mb1_ophi=15 & mb1_rnfill=1 & mb1_rn=4; # MOV  R4,A
-        mb2_ophi=10 & mb2_oplo=3;              # INC  DPTR
-        mb3_ophi=14 & mb3_oplo=0;              # MOVX A,@DPTR
-        mb4_ophi=15 & mb4_rnfill=1 & mb4_rn=5  # MOV  R5,A
+    :__sub16_R2R3_R4R5 is
+        mb0_ophi=14 & mb0_rnfill=1 & mb0_rn=5; # MOV  A,R5
+        mb1_ophi=12 & mb1_oplo=3;              # CLR  CY
+        mb2_ophi=9  & mb2_rnfill=1 & mb2_rn=3; # SUBB A,R3
+        mb3_ophi=15 & mb3_rnfill=1 & mb3_rn=3; # MOV  R3,A
+        mb4_ophi=14 & mb4_rnfill=1 & mb4_rn=4; # MOV  A,R4
+        mb5_ophi=9  & mb5_rnfill=1 & mb5_rn=2; # SUBB A,R2
+        mb6_ophi=15 & mb6_rnfill=1 & mb6_rn=2; # MOV  R2,A
+        mb7_ophi=4  & mb7_rnfill=1 & mb7_rn=3  # ORL  A,R3
     {
-        R4R5 = *[EXTMEM]:2 DPTR;
-        DPTR = DPTR + 1;
-    }
+        R2R3 = R2R3 - R4R5;
 
-    # :MOVX  Areg,ATDPTR  is ophi=14 & oplo=0 & Areg & ATDPTR { ACC = ATDPTR; }
-    # :INC DPTRreg is ophi=10 & oplo=3 & DPTRreg  { DPTR = DPTR + 1; }
+        # TODO: Model flags
+    }
 }
 
 # ==== Pseudo instructions: __ccopy ====================
@@ -473,32 +524,28 @@ with : ctx_meta_op_mode = 0 {
     # Implementations
     :__operator++ is ophi=1 & oplo=2; addr16=0x0bfc; inc_width=1 {
         local addr:2 = R2R3;
-
-        R3 = (*[EXTMEM]:1 addr) + 1;
-        *[EXTMEM]:1 addr = R3;
-        R3 = R3 - 1;
+        local v:1 = (*[EXTMEM]:1 addr);
+        *[EXTMEM]:1 addr = v;
+        R3 = v;
     }
     :__operator-- is ophi=1 & oplo=2; addr16=0x0c02; inc_width=1 {
         local addr:2 = R2R3;
-
-        R3 = (*[EXTMEM]:1 addr) - 1;
-        *[EXTMEM]:1 addr = R3;
-        R3 = R3 + 1;
+        local v:1 = (*[EXTMEM]:1 addr);
+        *[EXTMEM]:1 addr = v - 1;
+        R3 = v;
     }
 
     :__operator++ is ophi=1 & oplo=2; addr16=0x0bfc; inc_width=2 {
         local addr:2 = R2R3;
-
-        R2R3 = (*[EXTMEM]:2 addr) + 1;
-        *[EXTMEM]:2 addr = R2R3;
-        R2R3 = R2R3 - 1;
+        local v:2 = (*[EXTMEM]:2 addr);
+        *[EXTMEM]:2 addr = v + 1;
+        R2R3 = v;
     }
     :__operator-- is ophi=1 & oplo=2; addr16=0x0c02; inc_width=2 {
         local addr:2 = R2R3;
-
-        R2R3 = (*[EXTMEM]:2 addr) - 1;
-        *[EXTMEM]:1 addr = R2R3;
-        R2R3 = R2R3 + 1;
+        local v:2 = (*[EXTMEM]:2 addr);
+        *[EXTMEM]:2 addr = v - 1;
+        R2R3 = v;
     }
 }
 
