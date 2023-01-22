@@ -12,7 +12,7 @@ define space register type=register_space size=1;
 
     define register offset=0x0 size=2 [ PC ];
 
-# Internal memory, 512 RAM - adressing is weird
+# Internal memory, 512 RAM - addressing is weird
 #
 # The entire space can be indirectly adressed, however direct adresses
 #  within 0x80-0xFF actually index into the SFR space, which is a 
@@ -28,29 +28,38 @@ define space INTMEM type=ram_space size=1;
     # Technically these registers can also be remapped onto one of 4 banks, but
     #  this is not modeled at the moment.
     define INTMEM offset=0x00 size=1 [ R0 R1 R2 R3 R4 R5 R6 R7 ];
-    define INTMEM offset=0x00 size=2 [ R0R1  R2R3  R4R5  R6R7 ];
+    define INTMEM offset=0x00 size=2 [ R0R1  R2R3  R4R5  R6R7  ];
 
+# TODO: SFR is very sparsely populated, and is only direct addressable anyway..
+#  perhaps this could be modeled with a separate constructor for direct addresses
+#  into this area to catch illegal/extension writes?
+
+# Special register space, sparsely populated RAM read/set by on-chip hardware
+#
+# Contents of this space are mapped in accordance of the datasheet, thus
+#  the bottom 128 bytes are never used
 define space SFR type=ram_space size=1;
 
     define SFR offset=0xE0 size=1 [ ACC ];
     define SFR offset=0xF0 size=1 [ B ];
 
-    define SFR offset=0x82 size=1 [ DPL DPH ];
-    define SFR offset=0x82 size=2 [ DPTR ];
-
-    define SFR offset=0xA8 size=1 [ IE ];
-    define SFR offset=0x80 size=1 [ P0 ];
-    define SFR offset=0x90 size=1 [ P1 ];
-    define SFR offset=0xA0 size=1 [ P2 ];
-    define SFR offset=0xB0 size=1 [ P3 ];
+    # PSW is Intentionally not mapped to the correct place, instead represented as a
+    #  separate memory space `PSW_BITS`, where each bit is represented with a byte.
+    #
+    # The idea is so that this way CY access does not become a mess of shifting left
+    #  and right in the decompiler view, and we can compensate for direct reads/writes
+    #  to this SFR register via MOV specializations
+    #
+    # define SFR offset=0xD0 size=1 [ PSW ];
 
     define SFR offset=0x81 size=1 [ SP ];
 
-# In an effort to make decompiler output more legible, PSW bits are
-#  mapped into a separate address space as boolean values
+    define SFR offset=0x82 size=2 [ DPTR ];
+    define SFR offset=0x82 size=1 [ DPL DPH ];
+
 define space PSW_BITS type=ram_space size=1;
 
-    define PSW_BITS offset=0x0 size=1 [ Z OV RS0 RS1 N AC CY ];
+    define PSW_BITS offset=0x0 size=1 [ P _ OV RS0 RS1 F0 AC CY ];
 
 # External memory, 64k RAM
 define space EXTMEM type=ram_space size=2;
@@ -91,7 +100,7 @@ define context contextreg
 
 #TOKENS
 
-define token OpByte (8)
+define token OpByteToken (8)
     oplo     = (0,3)
     ophi     = (4,7)
     rn       = (0,2)
@@ -99,29 +108,32 @@ define token OpByte (8)
     ri       = (0,0)
     rifill   = (1,3)
 ;
-define token AddrByte1 (8)
+
+define token ByteAddrToken1 (8)
     direct1  = (0,7)
     bank1    = (7,7)
     mainreg1 = (0,6)
 ;
-define token AddrByte2 (8)
+define token ByteAddrToken2 (8)
     direct2  = (0,7)
     bank2    = (7,7)
     mainreg2 = (0,6)
 ;
-define token BitByte (8)
-    bitbank = (7,7)
-    sfrbyte = (3,7)
-    bitaddr57 = (5,7)
-    sfrbit3 = (3,3)
-    sfrbit  = (0,2) dec
-    lowbyte = (3,6)
-;
-define token AddrTwo (16)
+define token WordAddrToken (16)
     addr16 = (0,15)
 ;
 
-define token RelByte (8)  
+define token BitAddrToken (8)
+    baddr_bit  = (0,2) dec
+    baddr_byte = (3,7)
+    baddr_bank = (7,7)
+
+    baddr_psw = (0,2)
+;
+
+attach variables baddr_psw [ P _ OV RS0 RS1 F0 AC CY ];
+
+define token RelativeOffsetToken (8)  
     rel8 = (0,7) signed
 ;
 define token Data8 (8)  
@@ -143,6 +155,13 @@ attach variables  ri [ R0 R1 ];
 
 # flags macros
 
+macro bitread(bit, into, byte) {
+    into = (byte >> bit) & 1;
+}
+macro bitwrite(bit, into, byte) {
+    into = into & ~(1 << bit) | (!(!byte) << bit);
+}
+
 macro addflags(op1, op2) {
     CY = carry(op1,op2);
 }
@@ -156,8 +175,7 @@ macro compflags(op1, op2) {
 }
 
 macro resultflags(op1) {
-    N = op1 s< 0;
-    Z = op1 == 0;
+    # TODO
 }
 
 macro push8(val) {
@@ -225,6 +243,37 @@ Direct2: direct2   is bank2=1 & direct2  { export *[SFR]:1 direct2; }
 AddrRel: addr is rel8            [ addr = inst_next + rel8; ]                            { export *:1 addr; }
 Addr11:  addr is aopaddr & adata [ addr = (inst_next $and 0xf800)+(aopaddr*256)+adata; ] { export *:1 addr; }
 Addr16:  addr is addr16          [ addr = addr16 + 0; ]                                  { export *:1 addr; }
+
+with : baddr_byte != (0xD0 >> 3) {
+    # Addr1M resolves to bit addresses which are meant to be 
+    #  masked out of a real byte address
+
+    Addr1MaskedRaw: addr is baddr_bank=0 & baddr_byte [ addr = baddr_byte + 0x20; ] {
+        export *[INTMEM]:1 addr;
+    }
+    Addr1MaskedRaw: addr is baddr_bank=1 & baddr_byte [ addr = baddr_byte << 3; ] {
+        export *[SFR]:1 addr;
+    }
+
+    # NB: This seemingly pointless layer of indirection is used because Ghidra does not
+    #  like combinindg 'addr[baddr_bit]' in the patterns above, in this case references
+    #  to external memory get replaced with the raw address literal
+    Addr1M: Addr1MaskedRaw[baddr_bit] is Addr1MaskedRaw & baddr_bit {
+        export Addr1MaskedRaw;
+    }
+}
+
+with : baddr_byte = (0xD0 >> 3) {
+    # Special "unmasked" mapping for PSW registers, which are spared from the
+    #  bit banging normal Addr1M targets go through.
+    #
+    # This means that various bit addressing instructions will have two variants,
+    #  one working on "masked" bits, one on registers representing 1 bit of data
+
+    Addr1R: baddr_psw is baddr_psw {
+        export baddr_psw;
+    }
+}
 
 # Opcodes 
 
@@ -329,7 +378,20 @@ with : ctx_meta_op_mode = 0 {
 :MOV Ri,Imm8        is ophi=7           & Ri; Imm8         { Ri = Imm8; }
 :MOV RDPTR,Imm16    is ophi=9  & oplo=0 & RDPTR; Imm16     { DPTR = Imm16; }
 
-#:MOV CY,BitAddr is ophi=10 & oplo=2;  BitAddr & bitaddr57=7 & sfrbit3=0 & sfrbit & BitByteAddr {$(CY)= (BitByteAddr>>sfrbit)&1; }
+:MOV Rc,Addr1M is ophi=10 & oplo=2 & Rc; Addr1M & baddr_bit {
+    bitread(baddr_bit, CY, Addr1M);
+}
+:MOV Rc,Addr1R is ophi=10 & oplo=2 & Rc; Addr1R {
+    CY = Addr1R;
+}
+
+:MOV Addr1M,Rc is ophi=9 & oplo=2 & Rc; Addr1M & baddr_bit {
+    bitwrite(baddr_bit, Addr1M, CY);
+}
+:MOV Addr1R,Rc is ophi=9 & oplo=2 & Rc; Addr1R {
+    Addr1R = CY;
+}
+
 #:MOV BitAddr,CY is ophi=9  & oplo=2;  BitAddr & bitaddr57=7 & sfrbit3=0 & sfrbit & BitByteAddr { BitByteAddr = BitByteAddr & (~(1<<sfrbit)); BitByteAddr = BitByteAddr | ($(CY)<<sfrbit); }
 #:MOV CY,BitAddr is ophi=10 & oplo=2;  BitAddr & sfrbit & BitByteAddr { CY = BitAddr; }
 #:MOV BitAddr,CY is ophi=9  & oplo=2;  BitAddr & sfrbit & BitByteAddr { BitAddr = CY; }
