@@ -155,13 +155,6 @@ attach variables  ri [ R0 R1 ];
 
 # flags macros
 
-macro bitread(bit, into, byte) {
-    into = (byte >> bit) & 1;
-}
-macro bitwrite(bit, into, byte) {
-    into = into & ~(1 << bit) | (!(!byte) << bit);
-}
-
 macro addflags(op1, op2) {
     CY = carry(op1,op2);
 }
@@ -229,17 +222,6 @@ Direct: direct1   is bank1=1 & direct1   { export *[SFR]:1 direct1; }
 Direct2: mainreg2  is bank2=0 & mainreg2 { export *[INTMEM]:1 mainreg2; }
 Direct2: direct2   is bank2=1 & direct2  { export *[SFR]:1 direct2; }
 
-# BitAddr:     bitaddr is bitbank=1 & sfrbyte & sfrbit [ bitaddr =(sfrbyte << 3)+sfrbit; ] { export *[BITS]:1 bitaddr; }
-# BitAddr:     bitaddr is bitbank=0 & lowbyte & sfrbit [ bitaddr =(lowbyte << 3)+sfrbit; ] { export *[BITS]:1 bitaddr; }
-# BitAddr2: "/"bitaddr is bitbank=1 & sfrbyte & sfrbit [ bitaddr =(sfrbyte << 3)+sfrbit; ] { export *[BITS]:1 bitaddr; }
-# BitAddr2: "/"bitaddr is bitbank=0 & lowbyte & sfrbit [ bitaddr =(lowbyte << 3)+sfrbit; ] { export *[BITS]:1 bitaddr; }
-
-# BitByteAddr: byteaddr  is bitbank=1 & sfrbyte & sfrbit [ byteaddr =(sfrbyte << 3); ] { export *[SFR]:1 byteaddr; }
-# BitByteAddr: "A"       is bitbank=1 & sfrbyte=0x1C & sfrbit { export ACC; }
-# BitByteAddr: B         is bitbank=1 & sfrbyte=0x1E & sfrbit & B { export B; }
-# BitByteAddr: PSW       is bitbank=1 & sfrbyte=0x1A & sfrbit & PSW { export PSW; }
-# BitByteAddr: byteaddr  is bitbank=0 & lowbyte & sfrbit [ byteaddr = lowbyte + 0x20; ] { export *[INTMEM]:1 byteaddr; }
-
 AddrRel: addr is rel8            [ addr = inst_next + rel8; ]                            { export *:1 addr; }
 Addr11:  addr is aopaddr & adata [ addr = (inst_next $and 0xf800)+(aopaddr*256)+adata; ] { export *:1 addr; }
 Addr16:  addr is addr16          [ addr = addr16 + 0; ]                                  { export *:1 addr; }
@@ -303,10 +285,21 @@ with : ctx_meta_op_mode = 0 {
 :ANL Direct,Ra   is ophi=5 & oplo=2 & Ra; Direct  { Direct = Direct & ACC;  resultflags(Direct); }
 :ANL Direct,Imm8 is ophi=5 & oplo=3; Direct; Imm8 { Direct = Direct & Imm8; resultflags(Direct); }
 
-#:ANL CY,BitAddr   is ophi=8  & oplo=2; BitAddr  & bitaddr57=7 & sfrbit3=0 & sfrbit & BitByteAddr {tmp:1 = BitByteAddr; $(CY)=$(CY)& ((tmp>>sfrbit)&1); resultflags(tmp); }
-#:ANL CY,BitAddr2  is ophi=11 & oplo=0; BitAddr2 & bitaddr57=7 & sfrbit3=0 & sfrbit & BitByteAddr {tmp:1 = BitByteAddr; $(CY)=$(CY)& (~((tmp>>sfrbit)&1));  }
-#:ANL CY,BitAddr   is ophi=8  & oplo=2; BitAddr  & sfrbit & BitByteAddr {$(CY)=$(CY)& BitAddr; }
-#:ANL CY,BitAddr2  is ophi=11 & oplo=0; BitAddr2 & sfrbit & BitByteAddr {$(CY)=$(CY)& ~BitAddr2; }
+# C = C AND bit
+:ANL Rc,Addr1M is ophi=8 & oplo=2 & Rc; Addr1M & baddr_bit {
+    CY = CY & ((Addr1M >> baddr_bit) & 1); 
+}
+:ANL Rc,Addr1R is ophi=8 & oplo=2 & Rc; Addr1R {
+    CY = CY & Addr1R;
+}
+
+# C = C AND NOT bit
+:ANL Rc,!Addr1M is ophi=11 & oplo=0 & Rc; Addr1M & baddr_bit {
+    CY = CY & !((Addr1M >> baddr_bit) & 1); 
+}
+:ANL Rc,!Addr1R is ophi=11 & oplo=0 & Rc; Addr1R {
+    CY = CY & !Addr1R;
+}
 
 :CJNE Ra,Direct,AddrRel is ophi=11 & oplo=5 & Ra; Direct; AddrRel  { compflags(ACC,Direct); if (ACC!=Direct) goto AddrRel; }
 :CJNE Ra,Imm8,AddrRel   is ophi=11 & oplo=4 & Ra; Imm8;   AddrRel  { compflags(ACC,Imm8);   if (ACC!=Imm8)   goto AddrRel; }
@@ -316,14 +309,20 @@ with : ctx_meta_op_mode = 0 {
 :CLR Ra is ophi=14 & oplo=4 & Ra  { ACC = 0; }
 :CLR Rc is ophi=12 & oplo=3 & Rc  { CY = 0; }
 
-#:CLR BitAddr  is ophi=12 & oplo=2; BitAddr & bitaddr57=7 & sfrbit3=0 & sfrbit & BitByteAddr {  local tmp = ~(1<<sfrbit); BitByteAddr = BitByteAddr & tmp; }
-#:CLR BitAddr  is ophi=12 & oplo=2; BitAddr & sfrbit & BitByteAddr { BitAddr = 0; }
+:CLR Addr1M is ophi=12 & oplo=2; Addr1M & baddr_bit {
+    Addr1M = Addr1M & ~(1 << baddr_bit); # bit = 0
+}
 
 :CPL Ra is ophi=15 & oplo=4 & Ra  { ACC = ~ACC;  }
 :CPL Rc is ophi=11 & oplo=3 & Rc  { CY = CY ^ 1; }
 
-#:CPL BitAddr  is ophi=11 & oplo=2; BitAddr & bitaddr57=7 & sfrbit3=0 & sfrbit & BitByteAddr { tmp:1 = (1<<sfrbit); BitByteAddr = BitByteAddr ^ tmp; }
-#:CPL BitAddr  is ophi=11 & oplo=2; BitAddr & sfrbit & BitByteAddr { BitAddr = BitAddr ^ 1; }
+# bit = NOT bit
+:CPL Addr1M is ophi=11 & oplo=2; Addr1M & baddr_bit { 
+    Addr1M = Addr1M ^ (1 << baddr_bit);
+}
+:CPL Addr1R is ophi=11 & oplo=2; Addr1R {
+    Addr1R = !Addr1R; 
+}
 
 :DA Ra is ophi=13 & oplo=4 & Ra unimpl
 
@@ -344,15 +343,44 @@ with : ctx_meta_op_mode = 0 {
 :INC Ri      is ophi=0           & Ri    { Ri = Ri + 1; }
 :INC RDPTR   is ophi=10 & oplo=3 & RDPTR { DPTR = DPTR + 1; }
 
-#:JB  BitAddr,AddrRel is ophi=2 & oplo=0; BitAddr & bitaddr57=7 & sfrbit3=0 & sfrbit & BitByteAddr; AddrRel   { if (((BitByteAddr>>sfrbit)&1) == 1:1) goto AddrRel; }
-#:JBC BitAddr,AddrRel is ophi=1 & oplo=0; BitAddr & bitaddr57=7 & sfrbit3=0 & sfrbit & BitByteAddr; AddrRel   { tmp:1 = 1<<sfrbit; if ((BitByteAddr & tmp)==0) goto inst_next; BitByteAddr = BitByteAddr & ~tmp; goto AddrRel; }
-#:JB  BitAddr,AddrRel is ophi=2 & oplo=0; BitAddr & sfrbit & BitByteAddr; AddrRel   { if (BitAddr == 1:1) goto AddrRel; }
-#:JBC BitAddr,AddrRel is ophi=1 & oplo=0; BitAddr & sfrbit & BitByteAddr; AddrRel   { if (BitAddr == 0:1) goto inst_next; BitAddr = 0; goto AddrRel; }
+# Jump if bit = 1
+:JB Addr1M,AddrRel is ophi=2 & oplo=0; Addr1M & baddr_bit; AddrRel {
+    local bit:1 = (Addr1M >> baddr_bit) & 1;
+
+    if (bit) goto AddrRel;
+}
+:JB Addr1R,AddrRel is ophi=2 & oplo=0; Addr1R; AddrRel {
+    if (Addr1R) goto AddrRel;
+}
+
+# Jump if bit = 1, clear bit
+:JBC Addr1M,AddrRel is ophi=1 & oplo=0; Addr1M & baddr_bit; AddrRel {
+    local bit:1 = (Addr1M >> baddr_bit) & 1;
+
+    if (!bit) goto inst_next;
+
+    Addr1M = Addr1M & ~(1 << baddr_bit);
+    goto AddrRel;
+}
+:JBC Addr1R,AddrRel is ophi=1 & oplo=0; Addr1R; AddrRel {
+    if (!Addr1R) goto inst_next;
+
+    Addr1R = 0;
+    goto AddrRel;
+}
+
 :JC  AddrRel is ophi=4 & oplo=0 ; AddrRel  { if (CY != 0) goto AddrRel; }
 :JMP ADPTR   is ophi=7 & oplo=3 & ADPTR    { goto [ADPTR]; }
 
-#:JNB BitAddr,AddrRel is ophi=3 & oplo=0; BitAddr & bitaddr57=7 & sfrbit3=0 & sfrbit & BitByteAddr; AddrRel  { if (((BitByteAddr>>sfrbit)&1)==0:1) goto AddrRel; }
-#:JNB BitAddr,AddrRel is ophi=3 & oplo=0; BitAddr & sfrbit & BitByteAddr; AddrRel  { if (BitAddr == 0:1) goto AddrRel; }
+# Jump if bit = 0
+:JNB Addr1M,AddrRel is ophi=3 & oplo=0; Addr1M & baddr_bit; AddrRel { 
+    local bit:1 = (Addr1M >> baddr_bit) & 1;
+
+    if (!bit) goto AddrRel;
+}
+:JNB Addr1R,AddrRel is ophi=3 & oplo=0; Addr1R; AddrRel { 
+    if (!Addr1R) goto AddrRel;
+}
 
 :JNC AddrRel is ophi=5 & oplo=0; AddrRel  { if (CY  == 0) goto AddrRel; }
 :JNZ AddrRel is ophi=7 & oplo=0; AddrRel  { if (ACC != 0) goto AddrRel; }
@@ -379,22 +407,18 @@ with : ctx_meta_op_mode = 0 {
 :MOV RDPTR,Imm16    is ophi=9  & oplo=0 & RDPTR; Imm16     { DPTR = Imm16; }
 
 :MOV Rc,Addr1M is ophi=10 & oplo=2 & Rc; Addr1M & baddr_bit {
-    bitread(baddr_bit, CY, Addr1M);
+    CY = (Addr1M >> baddr_bit) & 1;
 }
 :MOV Rc,Addr1R is ophi=10 & oplo=2 & Rc; Addr1R {
     CY = Addr1R;
 }
 
 :MOV Addr1M,Rc is ophi=9 & oplo=2 & Rc; Addr1M & baddr_bit {
-    bitwrite(baddr_bit, Addr1M, CY);
+    Addr1M = Addr1M & ~(1 << baddr_bit) | (CY << baddr_bit);
 }
 :MOV Addr1R,Rc is ophi=9 & oplo=2 & Rc; Addr1R {
     Addr1R = CY;
 }
-
-#:MOV BitAddr,CY is ophi=9  & oplo=2;  BitAddr & bitaddr57=7 & sfrbit3=0 & sfrbit & BitByteAddr { BitByteAddr = BitByteAddr & (~(1<<sfrbit)); BitByteAddr = BitByteAddr | ($(CY)<<sfrbit); }
-#:MOV CY,BitAddr is ophi=10 & oplo=2;  BitAddr & sfrbit & BitByteAddr { CY = BitAddr; }
-#:MOV BitAddr,CY is ophi=9  & oplo=2;  BitAddr & sfrbit & BitByteAddr { BitAddr = CY; }
 
 :MOVC Ra,ADPTR is ophi=9 & oplo=3 & Ra & ADPTR  { ACC = *:1 ADPTR; }
 :MOVC Ra,APC   is ophi=8 & oplo=3 & Ra & APC    { ACC = *:1 APC; }
@@ -415,10 +439,21 @@ with : ctx_meta_op_mode = 0 {
 :ORL Direct,Ra   is ophi=4 & oplo=2 & Ra ; Direct   { Direct = Direct | ACC; }
 :ORL Direct,Imm8 is ophi=4 & oplo=3 ; Direct; Imm8  { Direct = Direct | Imm8; }
 
-#:ORL CY,BitAddr  is CY & ophi=7  & oplo=2; BitAddr  & bitaddr57=7 & sfrbit3=0 & sfrbit & BitByteAddr {$(CY)=$(CY)| ((BitByteAddr>>sfrbit)&1); }
-#:ORL CY,BitAddr2 is CY & ophi=10 & oplo=0; BitAddr2 & bitaddr57=7 & sfrbit3=0 & sfrbit & BitByteAddr {$(CY)=$(CY)| (((BitByteAddr>>sfrbit)&1)^1); }
-#:ORL CY,BitAddr  is CY & ophi=7  & oplo=2; BitAddr  & sfrbit & BitByteAddr {$(CY)=$(CY)| BitAddr; }
-#:ORL CY,BitAddr2 is CY & ophi=10 & oplo=0; BitAddr2 & sfrbit & BitByteAddr {$(CY)=$(CY)| (BitAddr2^1); }
+# C = C OR bit
+:ORL Rc,Addr1M is ophi=7 & oplo=2 & Rc; Addr1M & baddr_bit {
+    CY = CY | ((Addr1M >> baddr_bit) & 1);
+}
+:ORL Rc,Addr1R is ophi=7 & oplo=2 & Rc; Addr1R {
+    CY = CY | Addr1R;
+}
+
+# C = C OR NOT bit
+:ORL Rc,Addr1M is ophi=10 & oplo=0 & Rc; Addr1M & baddr_bit {
+    CY = CY | !((Addr1M >> baddr_bit) & 1);
+}
+:ORL Rc,Addr1R is ophi=10 & oplo=0 & Rc; Addr1R {
+    CY = CY | !Addr1R;
+}
 
 :POP  Direct is ophi=13 & oplo=0; Direct  { pop8(Direct); }
 
@@ -435,8 +470,13 @@ with : ctx_meta_op_mode = 0 {
 
 :SETB  CY is CY & ophi=13 & oplo=3  { CY = 1; }
 
-#:SETB BitAddr is ophi=13 & oplo=2; BitAddr & bitaddr57=7 & sfrbit3=0 & sfrbit & BitByteAddr { BitByteAddr = BitByteAddr | (1<<sfrbit); }
-#:SETB BitAddr is ophi=13 & oplo=2; BitAddr & sfrbit & BitByteAddr { BitAddr = 1; }
+# bit = 1
+:SETB Addr1M is ophi=13 & oplo=2; Addr1M & baddr_bit {
+    Addr1M = Addr1M | (1 << baddr_bit);
+}
+:SETB Addr1R is ophi=13 & oplo=2; Addr1R {
+    Addr1R = 1;
+}
 
 :SJMP AddrRel        is ophi=8 & oplo=0; AddrRel  { goto AddrRel; }
 
