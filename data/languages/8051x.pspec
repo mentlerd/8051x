@@ -1,9 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
 <processor_spec>
-  <programcounter register="PC"/>
-  
-  <volatile outputop="write_volatile" inputop="read_volatile">
-    <range space="SFR" first="0x0" last="0xFF"/>
-  </volatile>
+	<programcounter register="PC"/>
 </processor_spec>

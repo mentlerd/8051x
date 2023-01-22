@@ -331,7 +331,7 @@ with : ctx_meta_op_mode = 0 {
 :DEC Direct is ophi=1 & oplo=5 ; Direct  { Direct = Direct - 1; }
 :DEC Ri     is ophi=1          & Ri      { Ri = Ri - 1; }
 
-# :DIV ABreg     is ophi=8 & oplo=4 & ABreg unimpl
+:DIV "AB" is ophi=8 & oplo=4 unimpl
 
 :DJNZ Rn,AddrRel     is ophi=13 & rnfill=1 & Rn; AddrRel  { Rn = Rn - 1; if (Rn!=0) goto AddrRel; }
 :DJNZ Direct,AddrRel is ophi=13 & oplo=5; Direct; AddrRel  { Direct = Direct - 1; if (Direct!=0) goto AddrRel; }
@@ -428,7 +428,7 @@ with : ctx_meta_op_mode = 0 {
 :MOVX RiX,Ra    is ophi=15          & Ra & RiX     { RiX = ACC; }
 :MOVX ATDPTR,Ra is ophi=15 & oplo=0 & Ra & ATDPTR  { ATDPTR = ACC; }
 
-#:MUL ABreg         is ophi=10 & oplo=4 & ABreg     { PSW = PSW & 0x7b; tmp:2 = zext(ACC) * zext(B); ACC = tmp(0); B = tmp(1); PSW = PSW | ((B!=0)<<2); }
+:MUL "AB" is ophi=10 & oplo=4 unimpl
 
 :NOP is ophi=0  & oplo=0  { nop(); }
 
@@ -501,8 +501,6 @@ with : ctx_meta_op_mode = 0 {
 :XRL Direct,Imm8 is ophi=6 & oplo=3 ; Direct; Imm8 { Direct = Direct ^ Imm8; }
 
 }
-
-@if 0
 
 define token mb_0t (8) mb0_rn = (0,2) mb0_rnfill = (3,3) mb0_oplo = (0,3) mb0_ophi = (4,7);
 define token mb_1t (8) mb1_rn = (0,2) mb1_rnfill = (3,3) mb1_oplo = (0,3) mb1_ophi = (4,7);
@@ -714,5 +712,3 @@ with : ctx_meta_op_mode = 0 {
     }
 
 }
-
-@endif
