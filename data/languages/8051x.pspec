@@ -2,4 +2,11 @@
 
 <processor_spec>
 	<programcounter register="PC"/>
+
+	<volatile outputop="write_volatile" inputop="read_volatile">
+		<range space="SFR" first="0x80" last="0x80"/> <!-- P0 -->
+		<range space="SFR" first="0x90" last="0x90"/> <!-- P1 -->
+		<range space="SFR" first="0xA0" last="0xA0"/> <!-- P2 -->
+		<range space="SFR" first="0xB0" last="0xB0"/> <!-- P3 -->
+	</volatile>
 </processor_spec>

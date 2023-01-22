@@ -57,6 +57,13 @@ define space SFR type=ram_space size=1;
     define SFR offset=0x82 size=2 [ DPTR ];
     define SFR offset=0x82 size=1 [ DPL DPH ];
 
+    define SFR offset=0x80 size=1 [ P0 ];
+    define SFR offset=0x90 size=1 [ P1 ];
+    define SFR offset=0xA0 size=1 [ P2 ];
+    define SFR offset=0xB0 size=1 [ P3 ];
+    define SFR offset=0xB8 size=1 [ IP ];
+    define SFR offset=0xA8 size=1 [ IE ];
+
 define space PSW_BITS type=ram_space size=1;
 
     define PSW_BITS offset=0x0 size=1 [ P _ OV RS0 RS1 F0 AC CY ];
@@ -604,7 +611,7 @@ with : ctx_meta_op_mode = 0 {
     :__operator++ is ophi=1 & oplo=2; addr16=0x0bfc; inc_width=1 {
         local addr:2 = R2R3;
         local v:1 = (*[EXTMEM]:1 addr);
-        *[EXTMEM]:1 addr = v;
+        *[EXTMEM]:1 addr = v + 1;
         R3 = v;
     }
     :__operator-- is ophi=1 & oplo=2; addr16=0x0c02; inc_width=1 {
