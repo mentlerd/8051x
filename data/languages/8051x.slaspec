@@ -61,6 +61,7 @@ define CONTEXT offset=0x0 size=8 [ contextreg ];
 
 define context contextreg
     ctx_meta_op_mode       = (0, 0) noflow
+    ctx_lift_stack_ops     = (1, 1) noflow
 
     ctx_switch_arms_remain = (8,15) noflow
     ctx_switch_arms_max    = (16,31) noflow
@@ -139,6 +140,8 @@ macro resultflags(op1) { # Set N,Z flag for results
  $(Z) = op1 == 0;
 }
 
+@if 1
+
 macro push8(val) {
   SP = SP + 1;
   *[INTMEM]:1 SP = val;
@@ -167,6 +170,16 @@ macro pop16(val) {
   val = (zext(ah) << 8) | zext(al);
 }
 
+@else
+
+macro push8(val) {}
+macro pop8(val) {}
+
+macro push16(val) {}
+macro pop16(val) {}
+
+@endif
+
 # Operand display only
 CY:      "CY"    is epsilon          {}
 Areg:    "A"     is ophi             { export ACC; }
@@ -190,12 +203,22 @@ Data16:  "#"data16 is data16  { export *[const]:2 data16; }
 
 Direct:  mainreg   is bank=0 & mainreg  { export *[INTMEM]:1 mainreg; }
 
+Direct: "R0" is bank=0 & direct=0x00 { export R0; }
+Direct: "R1" is bank=0 & direct=0x01 { export R1; }
+Direct: "R2" is bank=0 & direct=0x02 { export R2; }
+Direct: "R3" is bank=0 & direct=0x03 { export R3; }
+Direct: "R4" is bank=0 & direct=0x04 { export R4; }
+Direct: "R5" is bank=0 & direct=0x05 { export R5; }
+Direct: "R6" is bank=0 & direct=0x06 { export R6; }
+Direct: "R7" is bank=0 & direct=0x07 { export R7; }
+
 Direct:  direct    is bank=1 & direct   { export *[SFR]:1 direct; }
 Direct:  PSW       is bank=1 & direct=0xD0 & PSW  { export PSW;  }
 Direct:  "A"       is bank=1 & direct=0xE0  { export ACC; }
 Direct:  B         is bank=1 & direct=0xF0 & B  { export B;  }
 Direct:  DPL       is bank=1 & direct=0x82 & DPL  { export DPL; }
 Direct:  DPH       is bank=1 & direct=0x83 & DPH  { export DPH;  }
+
 
 Direct2:  mainreg2  is bank2=0 & mainreg2 { export *[INTMEM]:1 mainreg2; }
 Direct2: direct2   is bank2=1 & direct2   { export *[SFR]:1 direct2; }
@@ -398,21 +421,28 @@ with : ctx_meta_op_mode = 0 {
 }
 
 
-define token mb_0t (8) mb0_rn = (0,2) mb0_rnfill = (3,3) mb0_oplo = (0,3) mb0_ophi = (4,7);
-define token mb_1t (8) mb1_rn = (0,2) mb1_rnfill = (3,3) mb1_oplo = (0,3) mb1_ophi = (4,7);
-define token mb_2t (8) mb2_rn = (0,2) mb2_rnfill = (3,3) mb2_oplo = (0,3) mb2_ophi = (4,7);
-define token mb_3t (8) mb3_rn = (0,2) mb3_rnfill = (3,3) mb3_oplo = (0,3) mb3_ophi = (4,7);
-define token mb_4t (8) mb4_rn = (0,2) mb4_rnfill = (3,3) mb4_oplo = (0,3) mb4_ophi = (4,7);
-define token mb_5t (8) mb5_rn = (0,2) mb5_rnfill = (3,3) mb5_oplo = (0,3) mb5_ophi = (4,7);
-define token mb_6t (8) mb6_rn = (0,2) mb6_rnfill = (3,3) mb6_oplo = (0,3) mb6_ophi = (4,7);
-define token mb_7t (8) mb7_rn = (0,2) mb7_rnfill = (3,3) mb7_oplo = (0,3) mb7_ophi = (4,7);
+define token mb_0t (8) mb0_f = (0,7) mb0_rn = (0,2) mb0_rnfill = (3,3) mb0_oplo = (0,3) mb0_ophi = (4,7);
+define token mb_1t (8) mb1_f = (0,7) mb1_rn = (0,2) mb1_rnfill = (3,3) mb1_oplo = (0,3) mb1_ophi = (4,7);
+define token mb_2t (8) mb2_f = (0,7) mb2_rn = (0,2) mb2_rnfill = (3,3) mb2_oplo = (0,3) mb2_ophi = (4,7);
+define token mb_3t (8) mb3_f = (0,7) mb3_rn = (0,2) mb3_rnfill = (3,3) mb3_oplo = (0,3) mb3_ophi = (4,7);
+define token mb_4t (8) mb4_f = (0,7) mb4_rn = (0,2) mb4_rnfill = (3,3) mb4_oplo = (0,3) mb4_ophi = (4,7);
+define token mb_5t (8) mb5_f = (0,7) mb5_rn = (0,2) mb5_rnfill = (3,3) mb5_oplo = (0,3) mb5_ophi = (4,7);
+define token mb_6t (8) mb6_f = (0,7) mb6_rn = (0,2) mb6_rnfill = (3,3) mb6_oplo = (0,3) mb6_ophi = (4,7);
+define token mb_7t (8) mb7_f = (0,7) mb7_rn = (0,2) mb7_rnfill = (3,3) mb7_oplo = (0,3) mb7_ophi = (4,7);
+define token mb_8t (8) mb8_f = (0,7) mb8_rn = (0,2) mb8_rnfill = (3,3) mb8_oplo = (0,3) mb8_ophi = (4,7);
+define token mb_9t (8) mb9_f = (0,7) mb9_rn = (0,2) mb9_rnfill = (3,3) mb9_oplo = (0,3) mb9_ophi = (4,7);
+
+define token mb_10t (8) mb10_f = (0,7);
+define token mb_11t (8) mb11_f = (0,7);
+define token mb_12t (8) mb12_f = (0,7);
+define token mb_13t (8) mb13_f = (0,7);
 
 # === Pseudo instructions: Wide register arithmetic ====================
 
 with : ctx_meta_op_mode = 0 {
     # TODO: CPU flags not modeled
 
-    :__add16 is
+    :__add16 "R2R3 += R4R5" is
         mb0_ophi=14 & mb0_rnfill=1 & mb0_rn=3; # MOV  A,R3
         mb1_ophi=2  & mb1_rnfill=1 & mb1_rn=5; # ADD  A,R5
         mb2_ophi=15 & mb2_rnfill=1 & mb2_rn=3; # MOV  R3,A
@@ -593,6 +623,8 @@ define token code_param_t16 (16) code_param16 = (0,1);
 define token code_param_t24 (24) code_param24 = (0,1);
 define token code_param_t32 (32) code_param32 = (0,1);
 
+@if 0
+
 with : ctx_meta_op_mode = 0 {
 
     # Weird LJMP specialization - function pointer support?
@@ -607,4 +639,65 @@ with : ctx_meta_op_mode = 0 {
         goto [target];
     }
 
+}
+
+@endif
+
+# ==== Pseudo instructions: stack relative addressing
+
+with : ctx_meta_op_mode = 0 & ctx_lift_stack_ops = 1 {
+
+    :__stack_v8 mb1_f is
+        mb0_f=0x74; # MOV A
+        mb1_f;      # Imm8
+        mb2_f=0x2F; # ADD A,R7
+        mb3_f=0xF5; 
+        mb4_f=0x82; # MOV DPL,A
+        mb5_f=0xE4; # CLR A
+        mb6_f=0x3E; # ADDC A,R6
+        mb7_f=0xF5;
+        mb8_f=0x83; # MOV DPH,A
+        mb9_f=0xE0; # MOVX A,@DPTR
+        epsilon
+    {
+        local off:2 = mb1_f;
+        local addr:2 = R6R7 + off;
+        ACC = *[EXTMEM]:1 addr;
+    }
+
+    :__stack_v16 mb1_f is
+        mb0_f=0x74;  # MOV A
+        mb1_f;       # Imm8
+        mb2_f=0x2F;  # ADD  A,R7
+        mb3_f=0xF5; 
+        mb4_f=0x82;  # MOV  DPL,A
+        mb5_f=0xE4;  # CLR  A
+        mb6_f=0x3E;  # ADDC A,R6
+        mb7_f=0xF5;
+        mb8_f=0x83;  # MOV  DPH,A
+        mb9_f=0xE0;  # MOVX A,@DPTR
+        mb10_f=0xFA; # MOV  R2,A
+        mb10_f=0xA3; # INC  DPTR
+        mb11_f=0xE0; # MOVX A,@DPTR
+        mb12_f=0xFB; # MOV  R3,A
+        epsilon
+    {
+        local off:2 = mb1_f;
+        local addr:2 = R6R7 + off;
+        R2R3 = *[EXTMEM]:2 addr;
+    }
+
+    :__stack_a16 mb1_f is
+        mb0_f=0x74;  # MOV A
+        mb1_f;       # Imm8
+        mb2_f=0x2F;  # ADD  A,R7
+        mb3_f=0xFB;  # MOV  R3,A
+        mb4_f=0xE4;  # CLR  A
+        mb5_f=0x3E;  # ADDC A,R6
+        mb6_f=0xFA;  # MOV  R2,A
+        epsilon
+    {
+        local off:2 = mb1_f;
+        R2R3 = R6R7 + off;
+    }
 }
